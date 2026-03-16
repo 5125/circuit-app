@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Circuit Timer</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:         #f2f0eb;
+  --surface:    #ffffff;
+  --border:     #dedad2;
+  --text:       #1c1c1a;
+  --muted:      #8a8880;
+  --light:      #c8c5be;
+  --green:      #1e9e6a;
+  --green-bg:   #e8f7f1;
+  --amber:      #d4780a;
+  --amber-bg:   #fef2e0;
+  --blue:       #2558e0;
+  --blue-bg:    #eef3ff;
+  --r:          16px;
+  --r-sm:       10px;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 2rem 1rem 4rem;
+}
+
+.app { width: 100%; max-width: 360px; }
+
+/* ── header ─────────────────────────────── */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+}
+.hdr-sub  { font-size: 12px; color: var(--muted); margin-bottom: 3px; letter-spacing: .02em; }
+.hdr-main { font-size: 18px; font-weight: 700; color: var(--text); }
+
+.round-pips { display: flex; gap: 6px; }
+.rpip {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--border); transition: background .3s;
+}
+.rpip.done    { background: var(--muted); }
+.rpip.current { background: var(--text); }
+
+/* ── exercise card ───────────────────────── */
+.ex-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 1.25rem 1rem 1rem;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.svg-stage {
+  width: 200px;
+  height: 180px;
+  margin: 0 auto 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.svg-stage svg { width: 100%; height: 100%; }
+
+.ex-name { font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.ex-tip  { font-size: 12px; color: var(--muted); }
+
+/* ── timer ───────────────────────────────── */
+.timer-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+}
+.stat-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: .6rem 1.1rem;
+  text-align: center;
+  min-width: 64px;
+}
+.stat-val  { font-size: 22px; font-weight: 700; color: var(--text); line-height: 1; }
+.stat-lbl  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+.timer-circle svg { display: block; }
+
+/* ── phase badge ─────────────────────────── */
+.phase-row { text-align: center; margin-bottom: 1rem; }
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  padding: 5px 16px;
+  border-radius: 20px;
+}
+.b-ready { background: #eeece7; color: var(--muted); }
+.b-work  { background: var(--green-bg); color: var(--green); }
+.b-rest  { background: var(--amber-bg); color: var(--amber); }
+.b-done  { background: var(--blue-bg);  color: var(--blue);  }
+
+/* ── progress dots ───────────────────────── */
+.dots-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 1.25rem;
+  min-height: 10px;
+}
+.dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--border); transition: background .3s;
+}
+.dot.active { background: var(--text); transform: scale(1.25); }
+.dot.done-d { background: var(--muted); }
+
+/* ── buttons ─────────────────────────────── */
+.btn-row { display: flex; gap: 10px; justify-content: center; }
+.btn {
+  padding: 12px 32px;
+  border-radius: var(--r-sm);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  transition: background .15s, transform .1s;
+}
+.btn:hover  { background: var(--bg); }
+.btn:active { transform: scale(.97); }
+.btn.primary {
+  background: var(--text);
+  color: #fff;
+  border-color: var(--text);
+}
+.btn.primary:hover   { opacity: .85; }
+.btn:disabled        { opacity: .3; cursor: default; pointer-events: none; }
+
+/* ── SVG exercise figure animations ─────── */
+@keyframes jj-arms {
+  0%,100% { transform: rotate(0deg); transform-origin: 50px 55px; }
+  50%      { transform: rotate(-45deg); transform-origin: 50px 55px; }
+}
+@keyframes jj-legs {
+  0%,100% { transform: translateX(0); }
+  50%      { transform: translateX(-14px); }
+}
+@keyframes bounce {
+  0%,100% { transform: translateY(0); }
+  50%      { transform: translateY(-6px); }
+}
+@keyframes knee-r {
+  0%,100% { transform: rotate(0deg) translateY(0); transform-origin: 90px 90px; }
+  40%,60% { transform: rotate(-60deg) translateY(0); transform-origin: 90px 90px; }
+}
+@keyframes knee-l {
+  0%,100% { transform: rotate(-60deg); transform-origin: 70px 90px; }
+  40%,60% { transform: rotate(0deg); transform-origin: 70px 90px; }
+}
+@keyframes plank-breathe {
+  0%,100% { transform: scaleY(1); transform-origin: center 100px; }
+  50%      { transform: scaleY(1.015); transform-origin: center 100px; }
+}
+@keyframes crunch-l {
+  0%,100% { transform: rotate(0deg); transform-origin: 60px 75px; }
+  50%      { transform: rotate(30deg); transform-origin: 60px 75px; }
+}
+@keyframes crunch-r {
+  0%,100% { transform: rotate(30deg); transform-origin: 140px 75px; }
+  50%      { transform: rotate(0deg); transform-origin: 140px 75px; }
+}
+@keyframes squat-body {
+  0%,100% { transform: translateY(0); }
+  50%      { transform: translateY(18px); }
+}
+@keyframes squat-knees {
+  0%,100% { transform: rotate(0deg); }
+  50%      { transform: rotate(35deg); }
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <div class="header">
+    <div>
+      <div class="hdr-sub">Circuit workout</div>
+      <div class="hdr-main" id="round-label">Round 1 of 3</div>
+    </div>
+    <div class="round-pips" id="round-pips"></div>
+  </div>
+
+  <!-- Exercise card -->
+  <div class="ex-card">
+    <div class="svg-stage" id="svg-stage">
+      <!-- ready state illustration -->
+      <svg viewBox="0 0 200 180" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="100" cy="38" r="16" fill="none" stroke="#c8c5be" stroke-width="3"/>
+        <line x1="100" y1="54" x2="100" y2="110" stroke="#c8c5be" stroke-width="3.5" stroke-linecap="round"/>
+        <line x1="100" y1="70" x2="72" y2="90" stroke="#c8c5be" stroke-width="3" stroke-linecap="round"/>
+        <line x1="100" y1="70" x2="128" y2="90" stroke="#c8c5be" stroke-width="3" stroke-linecap="round"/>
+        <line x1="100" y1="110" x2="82" y2="145" stroke="#c8c5be" stroke-width="3" stroke-linecap="round"/>
+        <line x1="100" y1="110" x2="118" y2="145" stroke="#c8c5be" stroke-width="3" stroke-linecap="round"/>
+        <text x="100" y="170" text-anchor="middle" font-size="13" fill="#c8c5be" font-family="sans-serif">tap start</text>
+      </svg>
+    </div>
+    <div class="ex-name" id="ex-name">Get Ready</div>
+    <div class="ex-tip"  id="ex-tip">3 rounds · 5 exercises · no equipment</div>
+  </div>
+
+  <!-- Timer -->
+  <div class="timer-row">
+    <div class="stat-box">
+      <div class="stat-val" id="round-num">1</div>
+      <div class="stat-lbl">round</div>
+    </div>
+
+    <div class="timer-circle">
+      <svg width="120" height="120" viewBox="0 0 120 120">
+        <circle cx="60" cy="60" r="50" fill="none" stroke="#e2dfd8" stroke-width="6"/>
+        <circle cx="60" cy="60" r="50" fill="none" stroke="#1c1c1a" stroke-width="6"
+          stroke-linecap="round" stroke-dasharray="314" stroke-dashoffset="0"
+          transform="rotate(-90 60 60)"
+          id="ring"
+          style="transition: stroke-dashoffset .5s linear, stroke .3s;"/>
+        <text x="60" y="55" text-anchor="middle"
+          font-size="30" font-weight="700" fill="#1c1c1a"
+          font-family="-apple-system,sans-serif" id="t-num">–</text>
+        <text x="60" y="73" text-anchor="middle"
+          font-size="11" fill="#8a8880"
+          font-family="-apple-system,sans-serif" id="t-sub">sec</text>
+      </svg>
+    </div>
+
+    <div class="stat-box">
+      <div class="stat-val" id="ex-num">1</div>
+      <div class="stat-lbl">exercise</div>
+    </div>
+  </div>
+
+  <!-- Phase badge -->
+  <div class="phase-row" id="phase-row">
+    <span class="badge b-ready">Ready</span>
+  </div>
+
+  <!-- Exercise dots -->
+  <div class="dots-row" id="dots-row"></div>
+
+  <!-- Buttons -->
+  <div class="btn-row">
+    <button class="btn"         onclick="resetTimer()">Reset</button>
+    <button class="btn primary" onclick="toggleTimer()" id="start-btn">Start</button>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     SVG ILLUSTRATIONS — each as a <template> tag
+════════════════════════════════════════════════════ -->
+
+<!-- 1. Jumping Jacks -->
+<template id="svg-jumping-jacks">
+<svg viewBox="0 0 200 180" xmlns="http://www.w3.org/2000/svg">
+  <!-- shadow -->
+  <ellipse cx="100" cy="170" rx="32" ry="5" fill="#e0ddd6"/>
+  <!-- whole figure bounces -->
+  <g style="animation: bounce 0.7s ease-in-out infinite;">
+    <!-- head -->
+    <circle cx="100" cy="30" r="14" fill="none" stroke="#1c1c1a" stroke-width="3"/>
+    <!-- torso -->
+    <line x1="100" y1="44" x2="100" y2="95" stroke="#1c1c1a" stroke-width="3.5" stroke-linecap="round"/>
+    <!-- LEFT arm (up) -->
+    <line x1="100" y1="58" x2="62" y2="38" stroke="#1c1c1a" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="62" cy="38" r="4" fill="#1c1c1a"/>
+    <!-- RIGHT arm (up) -->
+    <line x1="100" y1="58" x2="138" y2="38" stroke="#1c1c1a" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="138" cy="38" r="4" fill="#1c1c1a"/>
+    <!-- LEFT leg (out) -->
+    <line x1="100" y1="95" x2="66" y2="142" stroke="#1c1c1a" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="66" cy="142" r="5" fill="#1c1c1a"/>
+    <!-- RIGHT leg (out) -->
+    <line x1="100" y1="95" x2="134" y2="142" stroke="#1c1c1a" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="134" cy="142" r="5" fill="#1c1c1a"/>
+    <!-- motion arc arms -->
+    <path d="M 68 62 Q 55 48 62 38" fill="none" stroke="#dedad2" stroke-width="1.5" stroke-dasharray="4 3"/>
+    <path d="M 132 62 Q 145 48 138 38" fill="none" stroke="#dedad2" stroke-width="1.5" stroke-dasharray="4 3"/>
+  </g>
+  <text x="100" y="178" text-anchor="middle" font-size="11" fill="#8a8880" font-family="sans-serif">arms up · legs wide</text>
+</svg>
+</template>
+
+<!-- 2. High Knees -->
+<template id="svg-high-knees">
+<svg viewBox="0 0 200 180" xmlns="http://www.w3.org/2000/svg">
+  <!-- shadow -->
+  <ellipse cx="100" cy="170" rx="24" ry="4" fill="#e0ddd6"/>
+  <!-- body -->
+  <g style="animation: bounce 0.5s ease-in-out infinite;">
+    <!-- head -->
+    <circle cx="100" cy="28" r="14" fill="none" stroke="#1c1c1a" stroke-width="3"/>
+    <!-- torso slight lean -->
+    <line x1="100" y1="42" x2="97" y2="95" stroke="#1c1c1a" stroke-width="3.5" stroke-linecap="round"/>
+    <!-- LEFT arm back -->
+    <line x1="100" y1="58" x2="122" y2="78" stroke="#1c1c1a" stroke-width="3" stroke-linecap="round"/>
+    <line x1="122" y1="78" x2="130" y2="68" stroke="#1c1c1a" stroke-width="3" stroke-linecap="round"/>
+    <!-- RIGHT arm forward -->
+    <line x1="100" y1="58" x2="74" y2="75" stroke="#1c1c1a" stroke-width="3" stroke-linecap="round"/>
+    <line x1="74" y1="75" x2="66" y2="62" stroke="#1c1c1a" stroke-width="3" stroke-linecap="round"/>
+    <!-- RIGHT knee UP -->
+    <line x1="97" y1="95" x2="82" y2="120" stroke="#1c1c1a" stroke-width="3" stroke-linecap="round"/>
+    <line x1="82" y1="120" x2="96" y2="108" stroke="#1c1c1a" stroke-width="3" stroke-linecap="round"/>
+    <!-- raised knee highlight -->
+    <circle cx="82" cy="120" r="6" fill="#e8f7f1" stroke="#1e9e6a" stroke-width="2"/>
+    <!-- LEFT leg standing -->
+    <line x1="97" y1="95" x2="104" y2="130" stroke="#1c1c1a" stroke-width="3" stroke-linecap="round"/>
+    <line x1="104" y1="130" x2="106" y2="162" stroke="#1c1c1a" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="106" cy="162" r="5" fill="#1c1c1a"/>
+    <!-- motion lines -->
+    <line x1="68" y1="95" x2="58" y2="95" stroke="#dedad2" stroke-width="2" stroke-linecap="round"/>
+    <line x1="68" y1="102" x2="56" y2="102" stroke="#dedad2" stroke-width="2" stroke-linecap="round"/>
+    <line x1="68" y1="109" x2="60" y2="109" stroke="#dedad2" stroke-width="2" stroke-linecap="round"/>
+  </g>
+  <text x="100" y="178" text-anchor="middle" font-size="11" fill="#8a8880" font-family="sans-serif">drive knee to hip height</text>
+</svg>
+</template>
+
+<!-- 3. Plank -->
+<template id="svg-plank">
+<svg viewBox="0 0 200 180" xmlns="http://www.w3.org/2000/svg">
+  <!-- floor -->
+  <line x1="20" y1="148" x2="180" y2="148" stroke="#dedad2" stroke-width="1.5"/>
+  <!-- body (horizontal) -->
+  <g style="animation: plank-breathe 3s ease-in-out infinite;">
+    <!-- head -->
+    <circle cx="152" cy="106" r="13" fill="none" stroke="#1c1c1a" stroke-width="3"/>
+    <!-- neck-to-torso line -->
+    <line x1="140" y1="110" x2="60" y2="118" stroke="#1c1c1a" stroke-width="4" stroke-linecap="round"/>
+    <!-- right forearm -->
+    <line x1="134" y1="118" x2="128" y2="140" stroke="#1c1c1a" stroke-width="3" stroke-linecap="round"/>
+    <line x1="128" y1="140" x2="110" y2="142" stroke="#1c1c1a" stroke-width="3" stroke-linecap="round"/>
+    <!-- left forearm -->
+    <line x1="82" y1="120" x2="76" y2="140" stroke="#1c1c1a" stroke-width="3" stroke-linecap="round"/>
+    <line x1="76" y1="140" x2="58" y2="142" stroke="#1c1c1a" stroke-width="3" stroke-linecap="round"/>
+    <!-- hips -->
+    <ellipse cx="72" cy="116" rx="10" ry="7" fill="#f2f0eb" stroke="#1c1c1a" stroke-width="2.5"/>
+    <!-- right leg -->
+    <line x1="66" y1="120" x2="46" y2="145" stroke="#1c1c1a" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="44" cy="146" r="5" fill="#1c1c1a"/>
+    <!-- left leg -->
+    <line x1="76" y1="120" x2="56" y2="145" stroke="#1c1c1a" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="54" cy="146" r="5" fill="#1c1c1a"/>
+  </g>
+  <!-- alignment arrow -->
+  <line x1="40" y1="90" x2="160" y2="90" stroke="#e8f7f1" stroke-width="2" stroke-dasharray="5 3"/>
+  <text x="170" y="94" font-size="10" fill="#1e9e6a" font-family="sans-serif">→</text>
+  <text x="100" y="166" text-anchor="middle" font-size="11" fill="#8a8880" font-family="sans-serif">straight line · core tight</text>
+</svg>
+</template>
+
+<!-- 4. Bicycle Crunches -->
+<template id="svg-bicycle-crunches">
+<svg viewBox="0 0 200 180" xmlns="http://www.w3.org/2000/svg">
+  <!-- floor -->
+  <line x1="10" y1="148" x2="190" y2="148" stroke="#dedad2" stroke-width="1.5"/>
+  <!-- torso/hips base -->
+  <line x1="55" y1="120" x2="130" y2="118" stroke="#1c1c1a" stroke-width="4" stroke-linecap="round"/>
+  <!-- head lifted -->
+  <g style="animation: crunch-l 1s ease-in-out infinite;">
+    <circle cx="150" cy="96" r="13" fill="none" stroke="#1c1c1a" stroke-width="3"/>
+    <!-- right arm behind head -->
+    <line x1="140" y1="104" x2="128" y2="116" stroke="#1c1c1a" stroke-width="3" stroke-linecap="round"/>
+  </g>
+  <!-- left elbow tucked -->
+  <line x1="118" y1="118" x2="106" y2="105" stroke="#1c1c1a" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="106" cy="105" r="5" fill="#1c1c1a"/>
+  <!-- LEFT leg extended low -->
+  <line x1="55" y1="120" x2="24" y2="140" stroke="#1c1c1a" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="22" cy="141" r="5" fill="#1c1c1a"/>
+  <!-- RIGHT knee up & crossing -->
+  <g style="animation: crunch-r 1s ease-in-out infinite;">
+    <line x1="130" y1="118" x2="114" y2="100" stroke="#1c1c1a" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="114" cy="100" r="7" fill="#fef2e0" stroke="#d4780a" stroke-width="2"/>
+    <line x1="114" y1="106" x2="122" y2="130" stroke="#1c1c1a" stroke-width="3" stroke-linecap="round"/>
+  </g>
+  <!-- elbow-to-knee connector hint -->
+  <line x1="108" y1="107" x2="114" y2="102" stroke="#1e9e6a" stroke-width="1.5" stroke-dasharray="3 2"/>
+  <text x="100" y="166" text-anchor="middle" font-size="11" fill="#8a8880" font-family="sans-serif">elbow meets opposite knee</text>
+</svg>
+</template>
+
+<!-- REST -->
+<template id="svg-rest">
+<svg viewBox="0 0 200 180" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    @keyframes breathe {
+      0%,100% { transform: scaleY(1);   transform-origin: 100px 115px; }
+      50%      { transform: scaleY(1.04); transform-origin: 100px 115px; }
+    }
+    @keyframes zzz1 { 0%,100%{opacity:0;transform:translate(0,0)}  30%,70%{opacity:1} 100%{opacity:0;transform:translate(6px,-12px)} }
+    @keyframes zzz2 { 0%,20%{opacity:0;transform:translate(0,0)}  50%,80%{opacity:1} 100%{opacity:0;transform:translate(8px,-14px)} }
+    @keyframes zzz3 { 0%,40%{opacity:0;transform:translate(0,0)}  70%,90%{opacity:1} 100%{opacity:0;transform:translate(10px,-16px)} }
+  </style>
+  <!-- floor -->
+  <line x1="20" y1="155" x2="180" y2="155" stroke="#dedad2" stroke-width="1.5"/>
+  <!-- shadow -->
+  <ellipse cx="100" cy="157" rx="52" ry="5" fill="#e8e5de"/>
+
+  <!-- seated figure -->
+  <g style="animation: breathe 3s ease-in-out infinite;">
+    <!-- head tilted slightly back/aside — resting -->
+    <circle cx="118" cy="70" r="15" fill="none" stroke="#1c1c1a" stroke-width="3"/>
+    <!-- closed eye left -->
+    <path d="M 111 69 Q 113 67 115 69" fill="none" stroke="#1c1c1a" stroke-width="1.8" stroke-linecap="round"/>
+    <!-- closed eye right -->
+    <path d="M 119 69 Q 121 67 123 69" fill="none" stroke="#1c1c1a" stroke-width="1.8" stroke-linecap="round"/>
+    <!-- little smile -->
+    <path d="M 113 74 Q 118 78 123 74" fill="none" stroke="#1c1c1a" stroke-width="1.8" stroke-linecap="round"/>
+
+    <!-- torso leaned back on wall/knees -->
+    <line x1="112" y1="85" x2="100" y2="125" stroke="#1c1c1a" stroke-width="4" stroke-linecap="round"/>
+
+    <!-- left arm resting on knee -->
+    <line x1="108" y1="100" x2="84" y2="112" stroke="#1c1c1a" stroke-width="3" stroke-linecap="round"/>
+    <line x1="84" y1="112" x2="76" y2="128" stroke="#1c1c1a" stroke-width="3" stroke-linecap="round"/>
+
+    <!-- right arm drooped -->
+    <line x1="106" y1="100" x2="124" y2="115" stroke="#1c1c1a" stroke-width="3" stroke-linecap="round"/>
+    <line x1="124" y1="115" x2="130" y2="132" stroke="#1c1c1a" stroke-width="3" stroke-linecap="round"/>
+
+    <!-- hips on floor -->
+    <ellipse cx="97" cy="128" rx="14" ry="8" fill="#f2f0eb" stroke="#1c1c1a" stroke-width="2.5"/>
+
+    <!-- left leg bent up (knee resting) -->
+    <line x1="88"  y1="132" x2="68"  y2="148" stroke="#1c1c1a" stroke-width="3.5" stroke-linecap="round"/>
+    <line x1="68"  y1="148" x2="50"  y2="153" stroke="#1c1c1a" stroke-width="3.5" stroke-linecap="round"/>
+    <circle cx="50" cy="153" r="5" fill="#1c1c1a"/>
+
+    <!-- right leg stretched out -->
+    <line x1="108" y1="132" x2="138" y2="148" stroke="#1c1c1a" stroke-width="3.5" stroke-linecap="round"/>
+    <line x1="138" y1="148" x2="155" y2="153" stroke="#1c1c1a" stroke-width="3.5" stroke-linecap="round"/>
+    <circle cx="156" cy="153" r="5" fill="#1c1c1a"/>
+  </g>
+
+  <!-- Zzz floating up -->
+  <text x="136" y="62" font-size="11" font-weight="700" fill="#d4780a" font-family="sans-serif"
+    style="animation: zzz1 2.4s ease-in-out infinite;">z</text>
+  <text x="144" y="50" font-size="14" font-weight="700" fill="#d4780a" font-family="sans-serif"
+    style="animation: zzz2 2.4s ease-in-out infinite 0.5s;">z</text>
+  <text x="154" y="36" font-size="17" font-weight="700" fill="#d4780a" font-family="sans-serif"
+    style="animation: zzz3 2.4s ease-in-out infinite 1s;">Z</text>
+
+  <text x="100" y="174" text-anchor="middle" font-size="11" fill="#8a8880" font-family="sans-serif">breathe · recover · next up soon</text>
+</svg>
+</template>
+
+<!-- 5. Squats -->
+<template id="svg-squats">
+<svg viewBox="0 0 200 180" xmlns="http://www.w3.org/2000/svg">
+  <!-- floor -->
+  <line x1="30" y1="165" x2="170" y2="165" stroke="#dedad2" stroke-width="1.5"/>
+  <!-- whole figure squats down -->
+  <g style="animation: squat-body 1.2s ease-in-out infinite;">
+    <!-- head -->
+    <circle cx="100" cy="30" r="14" fill="none" stroke="#1c1c1a" stroke-width="3"/>
+    <!-- torso angled forward slightly -->
+    <line x1="100" y1="44" x2="96" y2="95" stroke="#1c1c1a" stroke-width="4" stroke-linecap="round"/>
+    <!-- arms stretched forward for balance -->
+    <line x1="100" y1="60" x2="68" y2="74" stroke="#1c1c1a" stroke-width="3" stroke-linecap="round"/>
+    <line x1="68" y1="74" x2="50" y2="72" stroke="#1c1c1a" stroke-width="3" stroke-linecap="round"/>
+    <line x1="100" y1="60" x2="132" y2="74" stroke="#1c1c1a" stroke-width="3" stroke-linecap="round"/>
+    <line x1="132" y1="74" x2="150" y2="72" stroke="#1c1c1a" stroke-width="3" stroke-linecap="round"/>
+    <!-- hips wide -->
+    <ellipse cx="97" cy="97" rx="13" ry="8" fill="#f2f0eb" stroke="#1c1c1a" stroke-width="2.5"/>
+    <!-- LEFT thigh angled -->
+    <line x1="88" y1="101" x2="72" y2="130" stroke="#1c1c1a" stroke-width="3.5" stroke-linecap="round"/>
+    <!-- LEFT shin down -->
+    <line x1="72" y1="130" x2="68" y2="158" stroke="#1c1c1a" stroke-width="3.5" stroke-linecap="round"/>
+    <circle cx="67" cy="159" r="6" fill="#1c1c1a"/>
+    <!-- RIGHT thigh angled -->
+    <line x1="106" y1="101" x2="122" y2="130" stroke="#1c1c1a" stroke-width="3.5" stroke-linecap="round"/>
+    <!-- RIGHT shin down -->
+    <line x1="122" y1="130" x2="126" y2="158" stroke="#1c1c1a" stroke-width="3.5" stroke-linecap="round"/>
+    <circle cx="127" cy="159" r="6" fill="#1c1c1a"/>
+    <!-- knee markers -->
+    <circle cx="72" cy="130" r="6" fill="#eef3ff" stroke="#2558e0" stroke-width="2"/>
+    <circle cx="122" cy="130" r="6" fill="#eef3ff" stroke="#2558e0" stroke-width="2"/>
+  </g>
+  <!-- depth guide arrows -->
+  <line x1="18" y1="44" x2="18" y2="158" stroke="#dedad2" stroke-width="1.5" stroke-dasharray="4 3"/>
+  <text x="14" y="104" font-size="10" fill="#c8c5be" font-family="sans-serif" transform="rotate(-90 14 104)">depth</text>
+  <text x="100" y="178" text-anchor="middle" font-size="11" fill="#8a8880" font-family="sans-serif">thighs parallel · heels flat</text>
+</svg>
+</template>
+
+<script>
+const ROUNDS = 3;
+const CIRC   = 314;
+
+const exercises = [
+  { name:"Jumping Jacks",    tip:"Arms up · legs out · full body burn",   work:40, rest:20, tpl:"svg-jumping-jacks"    },
+  { name:"High Knees",       tip:"Drive knee to hip height · stay tall",   work:40, rest:20, tpl:"svg-high-knees"       },
+  { name:"Plank",            tip:"Straight line from head to heel",        work:40, rest:20, tpl:"svg-plank"            },
+  { name:"Bicycle Crunches", tip:"Elbow meets opposite knee · slow down",  work:40, rest:20, tpl:"svg-bicycle-crunches" },
+  { name:"Squats",           tip:"Chest up · thighs parallel · heels flat",work:40, rest:20, tpl:"svg-squats"           },
+];
+
+let S = { running:false, round:1, exIdx:0, phase:"ready", timeLeft:0, interval:null, done:false };
+
+function getSVG(tplId) {
+  const tpl = document.getElementById(tplId);
+  return tpl ? tpl.innerHTML : "";
+}
+
+function getReadySVG() {
+  return document.getElementById("svg-stage").innerHTML;
+}
+
+function render() {
+  const ex = (S.phase !== "ready" && !S.done) ? exercises[S.exIdx] : null;
+
+  // round label
+  document.getElementById("round-label").textContent =
+    S.done ? "Complete! 🎉" : "Round " + S.round + " of " + ROUNDS;
+  document.getElementById("round-num").textContent = S.done ? "✓" : S.round;
+  document.getElementById("ex-num").textContent    = S.done ? "✓" : (S.exIdx + 1);
+
+  // round pips
+  const pips = document.getElementById("round-pips");
+  pips.innerHTML = "";
+  for (let i = 1; i <= ROUNDS; i++) {
+    const d = document.createElement("div");
+    d.className = "rpip" + (i < S.round ? " done" : i === S.round ? " current" : "");
+    pips.appendChild(d);
+  }
+
+  // SVG figure
+  const stage = document.getElementById("svg-stage");
+  if (S.done) {
+    stage.innerHTML = `<svg viewBox="0 0 200 180" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="100" cy="38" r="14" fill="none" stroke="#1c1c1a" stroke-width="3"/>
+      <line x1="100" y1="52" x2="100" y2="105" stroke="#1c1c1a" stroke-width="3.5" stroke-linecap="round"/>
+      <line x1="100" y1="68" x2="68" y2="52" stroke="#1c1c1a" stroke-width="3" stroke-linecap="round"/>
+      <line x1="100" y1="68" x2="132" y2="52" stroke="#1c1c1a" stroke-width="3" stroke-linecap="round"/>
+      <line x1="100" y1="105" x2="80" y2="148" stroke="#1c1c1a" stroke-width="3" stroke-linecap="round"/>
+      <line x1="100" y1="105" x2="120" y2="148" stroke="#1c1c1a" stroke-width="3" stroke-linecap="round"/>
+      <text x="100" y="170" text-anchor="middle" font-size="14" fill="#1e9e6a" font-weight="bold" font-family="sans-serif">Well done!</text>
+    </svg>`;
+  } else if (ex && S.phase === "rest") {
+    stage.innerHTML = getSVG("svg-rest");
+  } else if (ex) {
+    stage.innerHTML = getSVG(ex.tpl);
+  } else {
+    stage.innerHTML = `<svg viewBox="0 0 200 180" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="100" cy="38" r="16" fill="none" stroke="#c8c5be" stroke-width="3"/>
+      <line x1="100" y1="54" x2="100" y2="110" stroke="#c8c5be" stroke-width="3.5" stroke-linecap="round"/>
+      <line x1="100" y1="70" x2="72" y2="90" stroke="#c8c5be" stroke-width="3" stroke-linecap="round"/>
+      <line x1="100" y1="70" x2="128" y2="90" stroke="#c8c5be" stroke-width="3" stroke-linecap="round"/>
+      <line x1="100" y1="110" x2="82" y2="145" stroke="#c8c5be" stroke-width="3" stroke-linecap="round"/>
+      <line x1="100" y1="110" x2="118" y2="145" stroke="#c8c5be" stroke-width="3" stroke-linecap="round"/>
+      <text x="100" y="170" text-anchor="middle" font-size="13" fill="#c8c5be" font-family="sans-serif">tap start</text>
+    </svg>`;
+  }
+
+  // name & tip
+  const nextEx = (!S.done && S.phase === "rest") ? exercises[(S.exIdx + 1) % exercises.length] : null;
+  document.getElementById("ex-name").textContent = S.done ? "All done!" : (S.phase === "rest") ? "Rest" : ex ? ex.name : "Get Ready";
+  document.getElementById("ex-tip").textContent  = S.done ? "You crushed all 3 rounds 💪" :
+    (S.phase === "rest" && nextEx) ? "Next up: " + nextEx.name :
+    ex ? ex.tip : "3 rounds · 5 exercises · no equipment";
+
+  // timer ring
+  const maxT   = ex ? (S.phase === "work" ? ex.work : ex.rest) : 1;
+  const t      = Math.max(0, S.timeLeft);
+  const offset = (S.phase === "ready" || S.done) ? 0 : CIRC * (1 - t / maxT);
+  const ring   = document.getElementById("ring");
+  ring.setAttribute("stroke-dashoffset", offset.toFixed(1));
+  ring.style.stroke = S.phase === "rest" ? "#d4780a" : "#1c1c1a";
+  document.getElementById("t-num").textContent = (S.phase === "ready" || S.done) ? "–" : t;
+  document.getElementById("t-sub").textContent = S.phase === "rest" ? "rest" : "sec";
+
+  // badge
+  const pr = document.getElementById("phase-row");
+  if      (S.done)             pr.innerHTML = '<span class="badge b-done">Done ✓</span>';
+  else if (S.phase === "ready")pr.innerHTML = '<span class="badge b-ready">Ready</span>';
+  else if (S.phase === "work") pr.innerHTML = '<span class="badge b-work">Work — ' + ex.work + 's</span>';
+  else                         pr.innerHTML = '<span class="badge b-rest">Rest — ' + ex.rest + 's</span>';
+
+  // dots
+  const dr = document.getElementById("dots-row");
+  dr.innerHTML = "";
+  if (S.phase !== "ready" && !S.done) {
+    exercises.forEach((_, i) => {
+      const d = document.createElement("div");
+      d.className = "dot" + (i < S.exIdx ? " done-d" : i === S.exIdx ? " active" : "");
+      dr.appendChild(d);
+    });
+  }
+
+  // button
+  const btn = document.getElementById("start-btn");
+  btn.textContent = S.running ? "Pause" : (S.phase === "ready" ? "Start" : "Resume");
+  btn.disabled    = S.done;
+}
+
+function tick() {
+  if (S.timeLeft > 0) { S.timeLeft--; render(); return; }
+  if (S.phase === "work") {
+    S.phase    = "rest";
+    S.timeLeft = exercises[S.exIdx].rest;
+  } else {
+    S.exIdx++;
+    if (S.exIdx >= exercises.length) {
+      S.exIdx = 0; S.round++;
+      if (S.round > ROUNDS) {
+        clearInterval(S.interval); S.running = false; S.done = true;
+        render(); return;
+      }
+    }
+    S.phase    = "work";
+    S.timeLeft = exercises[S.exIdx].work;
+  }
+  render();
+}
+
+function toggleTimer() {
+  if (S.done) return;
+  if (!S.running) {
+    if (S.phase === "ready") {
+      S.phase = "work"; S.timeLeft = exercises[0].work; S.exIdx = 0; S.round = 1;
+    }
+    S.running  = true;
+    S.interval = setInterval(tick, 1000);
+  } else {
+    S.running = false;
+    clearInterval(S.interval);
+  }
+  render();
+}
+
+function resetTimer() {
+  clearInterval(S.interval);
+  S = { running:false, round:1, exIdx:0, phase:"ready", timeLeft:0, interval:null, done:false };
+  render();
+}
+
+render();
+</script>
+</body>
+</html>
